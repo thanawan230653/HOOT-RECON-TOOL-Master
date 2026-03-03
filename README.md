@@ -41,8 +41,8 @@ python -m pip install requests python-whois
 1. Download or clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/hootrecon.git
-cd hootrecon
+git clone https://github.com/thanawan230653/HOOT-RECON-TOOL-Master
+cd HOOT-RECON-TOOL-Master
 ```
 
 Or simply place `hoot.py` in any folder.
