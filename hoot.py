@@ -5,14 +5,8 @@ import socket
 import requests
 import whois
 import argparse
-from concurrent.futures import ThreadPoolExecutor
-
-COMMON_PORTS = [21, 22, 23, 25, 53, 80, 110, 143, 443, 3306, 8080]
 
 
-# -----------------------------
-# Resolve Domain
-# -----------------------------
 def resolve_domain(domain):
     try:
         ip = socket.gethostbyname(domain)
@@ -24,9 +18,6 @@ def resolve_domain(domain):
         return None
 
 
-# -----------------------------
-# Reverse DNS Lookup
-# -----------------------------
 def reverse_lookup(ip):
     try:
         result = socket.gethostbyaddr(ip)
@@ -35,9 +26,6 @@ def reverse_lookup(ip):
         print("[-] No PTR record found.")
 
 
-# -----------------------------
-# WHOIS Lookup
-# -----------------------------
 def whois_lookup(domain):
     try:
         w = whois.whois(domain)
@@ -49,69 +37,73 @@ def whois_lookup(domain):
         print("[-] WHOIS lookup failed.")
 
 
-# -----------------------------
-# IP Information (ASN / ISP / Country)
-# -----------------------------
 def ip_info(ip):
     try:
-        r = requests.get(f"http://ip-api.com/json/{ip}").json()
+        r = requests.get(f"http://ip-api.com/json/{ip}", timeout=5).json()
+
+        country = r.get("country")
+        region = r.get("regionName")
+        city = r.get("city")
+        isp = r.get("isp")
+        asn = r.get("as")
+        lat = r.get("lat")
+        lon = r.get("lon")
+
         print(f"\n[+] IP GEO INFORMATION")
-        print(f"    Country       : {r.get('country')}")
-        print(f"    Region        : {r.get('regionName')}")
-        print(f"    ISP           : {r.get('isp')}")
-        print(f"    ASN           : {r.get('as')}")
+        print(f"    Country       : {country}")
+        print(f"    Region        : {region}")
+        print(f"    City          : {city}")
+        print(f"    ISP           : {isp}")
+        print(f"    ASN           : {asn}")
+        print(f"    Latitude      : {lat}")
+        print(f"    Longitude     : {lon}")
+
+        if lat and lon:
+            print(f"\n    Google Maps   : https://www.google.com/maps?q={lat},{lon}")
+
     except:
         print("[-] Failed to retrieve IP information.")
 
 
-# -----------------------------
-# Port Scanner
-# -----------------------------
-def scan_port(ip, port):
+def check_ssh(ip):
+    print("\n[+] Checking SSH (Port 22)...")
+
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)
-        result = sock.connect_ex((ip, port))
-        sock.close()
+        sock.settimeout(3)
+        result = sock.connect_ex((ip, 22))
+
         if result == 0:
-            return port
+            print("    Status        : OPEN")
+
+            try:
+                banner = sock.recv(1024).decode(errors="ignore").strip()
+                if banner:
+                    print(f"    SSH Banner    : {banner}")
+            except:
+                pass
+        else:
+            print("    Status        : CLOSED or FILTERED")
+
+        sock.close()
+
     except:
-        pass
-    return None
+        print("    Status        : ERROR")
 
 
-def port_scan(ip):
-    print(f"\n[+] Scanning Common Ports...")
-    open_ports = []
-
-    with ThreadPoolExecutor(max_workers=50) as executor:
-        results = executor.map(lambda p: scan_port(ip, p), COMMON_PORTS)
-
-    for port in results:
-        if port:
-            open_ports.append(port)
-
-    if open_ports:
-        print(f"    Open Ports    : {open_ports}")
-    else:
-        print("    No common open ports detected.")
-
-
-# -----------------------------
-# Main Function
-# -----------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Hoot Recon Tool - Domain & IP Intelligence Scanner"
+        description="HootRecon - Domain & IP Intelligence Scanner"
     )
 
     parser.add_argument("target", help="Target domain name")
     parser.add_argument("--full", action="store_true", help="Perform full reconnaissance scan")
+    parser.add_argument("--ssh", action="store_true", help="Check SSH port (22)")
 
     args = parser.parse_args()
 
     print("\n========================================")
-    print("         HOOT RECON TOOL v1.0")
+    print("           HOOTRECON v4.0")
     print("========================================")
 
     ip = resolve_domain(args.target)
@@ -124,7 +116,9 @@ def main():
     if args.full:
         whois_lookup(args.target)
         ip_info(ip)
-        port_scan(ip)
+
+    if args.ssh:
+        check_ssh(ip)
 
 
 if __name__ == "__main__":
